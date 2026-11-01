@@ -1,0 +1,445 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="NUTLOCK ($NUTLOCK): the No Nut November holdout map. Pick a squad, take the pledge, keep the acorn locked for 30 days.">
+<meta name="theme-color" content="#0f0d0a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M6 13c0-5 4.5-8 10-8s10 3 10 8H6Z' fill='%238a5a2b'/%3E%3Cpath d='M8 14c0 7 3.5 13 8 13s8-6 8-13H8Z' fill='%23f2a93b'/%3E%3Crect x='12' y='16' width='8' height='7' rx='1.5' fill='%231a140c'/%3E%3Cpath d='M13.5 16v-2a2.5 2.5 0 0 1 5 0v2' stroke='%231a140c' stroke-width='1.6' fill='none'/%3E%3C/svg%3E">
+<title>NUTLOCK</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Martian+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* layout: a forest-floor map. full-screen canvas of squad colonies (each a cluster of pledgers), a field-guide panel docked left, a slim top bar; pledge, game and wall-of-F open as sheets over the map */
+:root{
+  color-scheme:dark;
+  --bg:#0f0d0a;--p1:rgba(23,19,14,.9);--p2:#211b13;--line:#2e271b;--line2:#41372a;
+  --ink:#f3ead8;--mut:#b5a88e;--dim:#7b6f59;
+  --gold:#f2a93b;--leaf:#e4572e;--moss:#9ccc5a;--ash:#5c564c;
+  --sans:'Bricolage Grotesque',system-ui,sans-serif;--mono:'Martian Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--sans)}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+input{font:inherit;color:inherit}
+a{color:inherit;text-decoration:none}
+#map{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#map.drag{cursor:grabbing}
+/* top bar */
+.top{position:fixed;left:0;right:0;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:12px 18px;background:linear-gradient(180deg,rgba(15,13,10,.95),rgba(15,13,10,0))}
+.logo{display:flex;align-items:center;gap:9px;font-weight:800;font-size:20px;letter-spacing:-.01em}
+.logo svg{display:block}
+.tabs{display:flex;gap:2px;margin-left:10px;background:rgba(23,19,14,.8);border:1px solid var(--line);border-radius:999px;padding:3px}
+.tabs button{font-size:13.5px;font-weight:500;padding:6px 13px;border-radius:999px;color:var(--mut)}
+.tabs button:hover{color:var(--ink)}
+.tabs button.on{background:var(--ink);color:#1a140c}
+.sp{flex:1}
+.day{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11.5px;color:var(--mut);border:1px solid var(--line2);border-radius:999px;padding:7px 12px;background:rgba(23,19,14,.8);white-space:nowrap}
+.day b{color:var(--gold);font-weight:500}
+.day i{width:7px;height:7px;border-radius:50%;background:var(--moss);animation:bl 1.6s infinite}
+@keyframes bl{50%{opacity:.3}}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:700;font-size:13.5px;padding:9px 16px;border-radius:999px;transition:transform .12s,background .2s}
+.btn:active{transform:scale(.96)}
+.btn.pri{background:var(--gold);color:#1e1408}
+.btn.pri:hover{background:#ffbb55}
+.btn.gh{border:1px solid var(--line2)}
+.btn.gh:hover{border-color:var(--gold)}
+.btn.red{background:var(--leaf);color:#1e0d06}
+.xb{width:34px;height:34px;border-radius:50%;border:1px solid var(--line2);display:grid;place-items:center;color:var(--mut);background:rgba(23,19,14,.8)}
+.xb:hover{color:var(--ink);border-color:var(--gold)}
+/* panel */
+.panel{position:fixed;left:16px;top:68px;bottom:16px;width:310px;z-index:15;display:flex;flex-direction:column;gap:10px;overflow-y:auto;scrollbar-width:none;padding-bottom:4px}
+.card{background:var(--p1);border:1px solid var(--line);border-radius:14px;padding:14px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.eyebrow{font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--dim);text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
+.live{font-family:var(--mono);font-size:9.5px;color:var(--moss);border:1px solid rgba(156,204,90,.4);border-radius:999px;padding:2px 7px}
+.card h1{font-size:26px;font-weight:800;margin:6px 0 6px;letter-spacing:-.02em}
+.card h1 em{font-style:italic;font-weight:500;color:var(--gold)}
+.card p{font-size:13px;line-height:1.5;color:var(--mut)}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.stats div{font-family:var(--mono);font-size:9.5px;color:var(--dim);letter-spacing:.06em}
+.stats b{display:block;font-family:var(--sans);font-size:20px;font-weight:700;color:var(--ink);letter-spacing:0;margin-top:2px}
+.stats b.g{color:var(--moss)}.stats b.r{color:var(--leaf)}
+.sub{font-family:var(--mono);font-size:10.5px;color:var(--mut);margin-top:10px;display:flex;gap:10px;flex-wrap:wrap}
+.sub span::before{content:"● ";color:var(--moss)}
+.sub span.f::before{color:var(--leaf)}
+.srch{display:flex;align-items:center;gap:8px;background:var(--p1);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.srch input{flex:1;background:none;border:0;outline:none;font-size:13.5px;min-width:0}
+.srch kbd{font-family:var(--mono);font-size:10px;color:var(--dim);border:1px solid var(--line2);border-radius:5px;padding:1px 6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.chip{font-size:12px;padding:6px 10px;border-radius:999px;border:1px solid var(--line2);color:var(--mut);display:flex;gap:6px;align-items:center}
+.chip b{font-family:var(--mono);font-size:10.5px;font-weight:500;color:var(--dim)}
+.chip.on{background:var(--ink);color:#1a140c;border-color:var(--ink)}.chip.on b{color:#6b5d44}
+.tm{margin-top:4px}
+.tm input{width:100%;accent-color:var(--gold)}
+.tm .row{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--dim)}
+.feedtabs{display:flex;gap:4px;margin-bottom:6px}
+.feedtabs button{font-size:12px;padding:5px 9px;border-radius:7px;color:var(--mut)}
+.feedtabs button.on{background:var(--p2);color:var(--ink)}
+.feed{list-style:none;max-height:260px;overflow-y:auto;scrollbar-width:thin}
+.feed li{display:grid;grid-template-columns:24px 1fr auto;gap:8px;align-items:center;padding:7px 2px;border-bottom:1px solid var(--line);font-size:12.5px;cursor:pointer}
+.feed li.new{animation:fin .5s ease}
+@keyframes fin{from{opacity:0;transform:translateX(-8px)}}
+.feed li .e{font-size:16px}
+.feed li b{font-weight:600}
+.feed li small{display:block;font-family:var(--mono);font-size:10px;color:var(--dim)}
+.feed li .t{font-family:var(--mono);font-size:10px;color:var(--dim)}
+.feed li.fell b{color:var(--leaf)}
+.hint{position:fixed;left:50%;top:62px;transform:translateX(-50%);z-index:12;font-family:var(--mono);font-size:10.5px;color:var(--dim);pointer-events:none;white-space:nowrap}
+.hint b{color:var(--mut);font-weight:500}
+.zoom{position:fixed;right:16px;bottom:16px;z-index:12;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:36px;height:36px;border-radius:10px;background:var(--p1);border:1px solid var(--line);font-size:18px;color:var(--mut)}
+.zoom button:hover{color:var(--ink);border-color:var(--gold)}
+/* squirrel mascot */
+.mascot{position:fixed;right:18px;bottom:16px;z-index:12;width:120px;cursor:pointer;margin-right:52px;transition:transform .2s}
+.mascot:hover{transform:translateY(-4px) rotate(-3deg)}
+.mascot .bub{position:absolute;bottom:100%;right:30px;background:var(--ink);color:#1a140c;font-size:12px;font-weight:600;padding:7px 10px;border-radius:12px 12px 2px 12px;white-space:nowrap;opacity:0;transform:translateY(6px);transition:.25s;pointer-events:none}
+.mascot .bub.on{opacity:1;transform:none}
+.tail{transform-origin:70px 95px;animation:tail 2.4s ease-in-out infinite}
+@keyframes tail{50%{transform:rotate(-8deg)}}
+.shake{animation:sq .4s}
+@keyframes sq{25%{transform:rotate(-8deg)}75%{transform:rotate(8deg)}}
+/* tooltip + side drawer */
+.tip{position:fixed;z-index:30;pointer-events:none;background:var(--p1);border:1px solid var(--line2);border-radius:10px;padding:9px 11px;font-size:12px;min-width:160px;opacity:0;transition:opacity .12s}
+.tip.on{opacity:1}
+.tip b{font-size:13.5px}
+.tip .r{display:flex;justify-content:space-between;gap:12px;font-family:var(--mono);font-size:10.5px;color:var(--mut);margin-top:3px}
+.drawer{position:fixed;top:68px;right:16px;bottom:16px;width:330px;z-index:16;background:var(--p1);border:1px solid var(--line);border-radius:14px;padding:16px;transform:translateX(calc(100% + 30px));transition:transform .3s cubic-bezier(.2,.8,.2,1);overflow-y:auto;backdrop-filter:blur(8px)}
+.drawer.on{transform:none}
+.dh{display:flex;align-items:center;gap:12px;margin-bottom:12px;padding-right:30px}
+.dh .em{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;font-size:26px;background:var(--p2);border:2px solid var(--gold)}
+.dh h3{font-size:20px;font-weight:800}
+.dh small{font-family:var(--mono);font-size:10.5px;color:var(--dim)}
+.close{position:absolute;right:12px;top:12px;width:28px;height:28px;border-radius:50%;border:1px solid var(--line2);color:var(--mut)}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:10px 0}
+.kv div{border:1px solid var(--line);border-radius:10px;padding:9px 11px;font-family:var(--mono);font-size:9.5px;color:var(--dim)}
+.kv b{display:block;font-family:var(--sans);font-size:17px;color:var(--ink);margin-top:3px}
+.surv{height:8px;border-radius:8px;background:rgba(228,87,46,.35);overflow:hidden;margin:6px 0 4px}
+.surv i{display:block;height:100%;background:var(--moss);transition:width .6s}
+.mem{list-style:none;margin-top:8px}
+.mem li{display:flex;justify-content:space-between;font-size:12.5px;padding:6px 0;border-bottom:1px solid var(--line)}
+.mem li span:last-child{font-family:var(--mono);font-size:10.5px;color:var(--mut)}
+.mem li.fell span:first-child{color:var(--dim);text-decoration:line-through}
+/* sheets */
+.scrim{position:fixed;inset:0;z-index:40;background:rgba(8,6,4,.6);opacity:0;pointer-events:none;transition:.25s;backdrop-filter:blur(3px)}
+.scrim.on{opacity:1;pointer-events:auto}
+.sheet{position:fixed;left:50%;top:50%;z-index:41;width:min(520px,calc(100% - 24px));max-height:calc(100vh - 40px);overflow-y:auto;background:#17130e;border:1px solid var(--line2);border-radius:18px;padding:22px;transform:translate(-50%,-46%) scale(.97);opacity:0;pointer-events:none;transition:.25s}
+.sheet.on{opacity:1;pointer-events:auto;transform:translate(-50%,-50%)}
+.sheet.wide{width:min(860px,calc(100% - 24px))}
+.sheet h2{font-size:26px;font-weight:800;letter-spacing:-.02em;margin-bottom:6px}
+.sheet p.lead{font-size:14px;color:var(--mut);line-height:1.55;margin-bottom:14px}
+label.l{display:block;font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--dim);margin:12px 0 6px;text-transform:uppercase}
+.inp{width:100%;background:var(--bg);border:1px solid var(--line2);border-radius:10px;padding:11px 12px;font-size:15px;outline:none}
+.inp:focus{border-color:var(--gold)}
+.squads{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.squads button{display:flex;align-items:center;gap:7px;padding:9px;border:1px solid var(--line2);border-radius:10px;font-size:12.5px;text-align:left}
+.squads button.on{border-color:var(--gold);background:rgba(242,169,59,.1)}
+.squads button span{font-size:17px}
+.oath{border-left:3px solid var(--gold);padding:10px 14px;margin:14px 0;font-size:14px;line-height:1.55;font-style:italic;color:var(--ink);background:rgba(242,169,59,.06);border-radius:0 10px 10px 0}
+.me{border:1px solid var(--line2);border-radius:14px;padding:16px;text-align:center}
+.me .big{font-size:56px;font-weight:800;line-height:1;color:var(--gold)}
+.me .big small{font-size:16px;color:var(--mut);font-weight:500}
+.cal{display:grid;grid-template-columns:repeat(10,1fr);gap:4px;margin:14px 0}
+.cal i{aspect-ratio:1;border-radius:5px;background:var(--p2);border:1px solid var(--line);display:grid;place-items:center;font-style:normal;font-family:var(--mono);font-size:9px;color:var(--dim)}
+.cal i.ok{background:rgba(156,204,90,.18);border-color:rgba(156,204,90,.5);color:var(--moss)}
+.cal i.today{border-color:var(--gold);color:var(--gold)}
+.cal i.dead{background:rgba(228,87,46,.15);border-color:rgba(228,87,46,.45);color:var(--leaf)}
+.row2{display:flex;gap:8px;margin-top:12px}.row2 .btn{flex:1}
+/* game */
+#game{width:100%;aspect-ratio:16/10;display:block;background:radial-gradient(ellipse at 50% 100%,#2a2015,#120f0b);border-radius:12px;border:1px solid var(--line);cursor:crosshair;touch-action:none}
+.ghud{display:flex;justify-content:space-between;align-items:center;margin:10px 0 0;font-family:var(--mono);font-size:12px;color:var(--mut);flex-wrap:wrap;gap:8px}
+.ghud b{color:var(--ink)}
+/* wall */
+.wall{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-top:10px;max-height:46vh;overflow-y:auto}
+.grave{border:1px solid var(--line);border-radius:30px 30px 8px 8px;padding:14px 10px 10px;text-align:center;background:linear-gradient(#1d1810,#15110c)}
+.grave b{display:block;font-size:13px}
+.grave small{font-family:var(--mono);font-size:10px;color:var(--dim)}
+.fbtn{display:flex;align-items:center;justify-content:center;gap:14px;margin:6px 0 4px}
+.fkey{width:74px;height:74px;border-radius:14px;background:var(--ink);color:#1a140c;font-size:34px;font-weight:800;box-shadow:0 6px 0 #8a7b5f;transition:transform .06s,box-shadow .06s}
+.fkey:active,.fkey.hit{transform:translateY(5px);box-shadow:0 1px 0 #8a7b5f}
+.fcount{font-family:var(--mono);font-size:12px;color:var(--mut)}
+.fcount b{display:block;font-family:var(--sans);font-size:28px;color:var(--ink)}
+.fpop{position:fixed;z-index:90;pointer-events:none;font-weight:800;font-size:26px;color:var(--gold);animation:fp 1s ease-out forwards}
+@keyframes fp{to{transform:translateY(-80px);opacity:0}}
+.toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,16px);z-index:95;background:var(--ink);color:#1a140c;font-weight:600;font-size:13.5px;padding:10px 16px;border-radius:999px;opacity:0;pointer-events:none;transition:.25s}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+.leaf{position:fixed;top:-30px;z-index:11;pointer-events:none;font-size:18px;animation:lf linear forwards}
+@keyframes lf{to{transform:translate(var(--dx),110vh) rotate(var(--r))}}
+@media (max-width:900px){
+  .panel{top:auto;bottom:0;left:0;right:0;width:auto;height:44vh;padding:0 10px 10px;background:linear-gradient(180deg,rgba(15,13,10,0),rgba(15,13,10,.95) 18%)}
+  .panel .intro p,.panel .tmcard{display:none}
+  .tabs{display:none}
+  .hint{display:none}
+  .drawer{left:10px;right:10px;width:auto;top:auto;height:56vh;bottom:10px}
+  .mascot{width:80px;bottom:46vh;margin-right:0;right:8px}
+  .zoom{display:none}
+  .day .lb{display:none}
+}
+@media (max-width:520px){.logo span{display:none}.squads{grid-template-columns:1fr 1fr}.cal{grid-template-columns:repeat(6,1fr)}}
+</style>
+</head>
+<body>
+
+
+<canvas id="map"></canvas>
+
+<header class="top">
+  <div class="logo"><svg width="30" height="30" viewBox="0 0 32 32"><path d="M6 13c0-5 4.5-8 10-8s10 3 10 8H6Z" fill="#8a5a2b"/><path d="M6 13h20" stroke="#5c3a19" stroke-width="2"/><path d="M14 5c0-2 1-3 3-3" stroke="#5c3a19" stroke-width="2" fill="none" stroke-linecap="round"/><path d="M8 14c0 7 3.5 13 8 13s8-6 8-13H8Z" fill="#f2a93b"/><rect x="12" y="16" width="8" height="7" rx="1.5" fill="#1a140c"/><path d="M13.5 16v-2a2.5 2.5 0 0 1 5 0v2" stroke="#1a140c" stroke-width="1.6" fill="none"/><circle cx="16" cy="19.5" r="1.1" fill="#f2a93b"/></svg><span>NUTLOCK</span></div>
+  <nav class="tabs"><button class="on" data-go="map">Map</button><button data-go="pledge">My pledge</button><button data-go="game">Resist</button><button data-go="wall">Wall of F</button></nav>
+  <span class="sp"></span>
+  <div class="day"><i></i><span id="dayTxt">—</span></div>
+  <button class="btn pri" id="pledgeBtn">Take the pledge</button>
+  <a class="xb" id="xLink" href="https://x.com/UseNutlock" target="_blank" rel="noopener" aria-label="NUTLOCK on X" title="@UseNutlock on X"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M17.75 3h3.07l-6.7 7.66L22 21h-6.17l-4.83-6.32L5.47 21H2.4l7.17-8.2L2 3h6.33l4.37 5.77L17.75 3Zm-1.08 16.2h1.7L7.42 4.7H5.6l11.07 14.5Z"/></svg></a>
+</header>
+
+<div class="hint"><b>click</b> a squad to open it · <b>scroll</b> to zoom · <b>drag</b> to move things around · <b>/</b> search</div>
+
+<aside class="panel">
+  <div class="card intro">
+    <div class="eyebrow"><span>Holdout map · all squads</span><span class="live">LIVE</span></div>
+    <h1>The <em>holdout</em> map</h1>
+    <p>No Nut November, mapped. Every squad is a colony and every dot is someone who took the pledge. Gold dots are still holding, green ones joined in the last hour, grey ones fell. A ring pulses when someone new pledges.</p>
+    <div class="stats"><div>PLEDGED<b id="sP">0</b></div><div>HOLDING<b class="g" id="sH">0</b></div><div>FELL<b class="r" id="sF">0</b></div></div>
+    <div class="sub"><span id="sNew">0 new in the last hour</span><span class="f" id="sRate">0 F/min</span></div>
+  </div>
+  <label class="srch"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="q" placeholder="Find a squad or a name"><kbd>/</kbd></label>
+  <div class="card">
+    <div class="eyebrow"><span>Highlight</span></div>
+    <div class="chips" id="hl">
+      <button class="chip on" data-h="all">Everyone</button><button class="chip" data-h="hold">Holding <b id="cH">0</b></button><button class="chip" data-h="fell">Fell <b id="cF">0</b></button><button class="chip" data-h="new">New 1h <b id="cN">0</b></button><button class="chip" data-h="you">You</button>
+    </div>
+  </div>
+  <div class="card tmcard">
+    <div class="eyebrow"><span>Time machine</span><span id="tmV">today</span></div>
+    <div class="tm"><input type="range" id="tm" min="0" max="30" value="0"><div class="row"><span>Nov 1</span><span>Nov 15</span><span>Nov 30</span></div></div>
+    <p style="font-size:12px;margin-top:6px;color:var(--dim)">Drag ahead to see how the map holds up.</p>
+  </div>
+  <div class="card">
+    <div class="feedtabs"><button class="on" data-f="all">All</button><button data-f="pledge">Pledges</button><button data-f="fell">Fell</button><button data-f="squads">Squads</button></div>
+    <ul class="feed" id="feed"></ul>
+  </div>
+</aside>
+
+<div class="zoom"><button id="zi" aria-label="Zoom in">+</button><button id="zo" aria-label="Zoom out">−</button><button id="zr" aria-label="Reset view" style="font-size:13px">⤢</button></div>
+
+<div class="mascot" id="mascot" title="Nutty the squirrel">
+  <div class="bub" id="bub">I'm not touching it.</div>
+  <svg viewBox="0 0 120 120"><g class="tail"><path d="M70 95c22-4 40-22 34-46-4-16-22-22-30-12 12 2 16 14 10 24-6 12-20 14-22 26Z" fill="#a8693a"/><path d="M78 90c14-6 24-18 20-34" stroke="#c8874f" stroke-width="5" fill="none" stroke-linecap="round"/></g>
+  <ellipse cx="54" cy="84" rx="22" ry="24" fill="#b5733f"/><ellipse cx="50" cy="90" rx="12" ry="15" fill="#e8c9a0"/>
+  <circle cx="50" cy="52" r="18" fill="#b5733f"/><path d="M38 38l-4-12 10 7z M56 36l6-11 2 12z" fill="#b5733f"/><circle cx="44" cy="50" r="3.2" fill="#1a140c"/><circle cx="56" cy="50" r="3.2" fill="#1a140c"/><circle cx="45" cy="49" r="1" fill="#fff"/><circle cx="57" cy="49" r="1" fill="#fff"/><ellipse cx="50" cy="58" rx="3" ry="2" fill="#3a2414"/><path d="M47 63q3 2 6 0" stroke="#3a2414" stroke-width="1.5" fill="none"/>
+  <g id="acorn"><path d="M41 78c0-5 4-8 9-8s9 3 9 8z" fill="#7a4e24"/><path d="M42 79c0 7 3.5 12 8 12s8-5 8-12z" fill="#f2a93b"/><rect x="46" y="81" width="8" height="6" rx="1.2" fill="#1a140c"/><path d="M47.5 81v-1.8a2.5 2.5 0 0 1 5 0V81" stroke="#1a140c" stroke-width="1.3" fill="none"/></g>
+  <ellipse cx="40" cy="80" rx="5" ry="4" fill="#b5733f"/><ellipse cx="60" cy="80" rx="5" ry="4" fill="#b5733f"/></svg>
+</div>
+
+<div class="tip" id="tip"></div>
+<aside class="drawer" id="drawer"></aside>
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const rnd=(a,b)=>a+Math.random()*(b-a),pick=a=>a[Math.floor(Math.random()*a.length)],clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt=n=>Math.round(n).toLocaleString();
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2400)}
+const store={get(k,d){try{const v=localStorage.getItem('nutlock-'+k);return v?JSON.parse(v):d}catch(e){return d}},set(k,v){try{localStorage.setItem('nutlock-'+k,JSON.stringify(v))}catch(e){}}};
+
+/* ---------- calendar ---------- */
+function nnnYear(){const n=new Date();return n.getMonth()===11?n.getFullYear()+1:n.getFullYear()}
+const START=new Date(nnnYear(),10,1).getTime(),END=new Date(nnnYear(),11,1).getTime();
+function realDay(){const n=Date.now();if(n<START)return 0;if(n>=END)return 31;return Math.floor((n-START)/86400000)+1}
+let viewDay=0; // time machine (0 = live)
+const curDay=()=>viewDay||realDay();
+
+/* ---------- squads ---------- */
+const SQ=[
+ ['Monks','MONK','🧘',220],['Gym Bros','GYM','💪',260],['Cold Showers','COLD','🧊',150],['Gamers','GAMER','🎮',300],['Crypto Degens','DEGEN','📉',280],['Philosophers','STOIC','🗿',140],
+ ['Day One Club','DAY1','📅',120],['Squirrels','NUTS','🐿️',180],['Sigma Grind','SIGMA','🐺',200],['Touch Grass','GRASS','🌱',110],['Diamond Hands','HODL','💎',170],['Married Guys','RING','💍',90]];
+const FIRST=['Jake','Tyler','Omar','Leo','Sam','Kai','Dev','Max','Noah','Eli','Ravi','Theo','Jules','Marco','Finn','Ash','Cody','Ben','Zane','Luis','Ari','Mo','Dante','Nico'],SUF=['_holds','.exe','42','_irl','x','_og','1337','_stoic','_lifts','99','_nnn','_locked','',''];
+const rname=()=>pick(FIRST)+pick(SUF)+(Math.random()<.4?Math.floor(rnd(1,99)):'');
+let seed=11;const srnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647};
+const squads=SQ.map((s,i)=>({i,name:s[0],tk:s[1],em:s[2],base:s[3],x:0,y:0,vx:0,vy:0,R:0,members:[],grit:.88+srnd()*.1,pulse:0}));
+// each member: fall day (1..∞) decided by squad grit
+function fallDay(grit){let d=1;while(d<=31&&Math.random()<grit+.06)d++;return d<=30?d+Math.random():99}
+let you=store.get('you',null);
+function mkMember(s,joinedAgo){return{name:rname(),sq:s,fall:fallDay(s.grit),joined:Date.now()-joinedAgo,a:0,r:0,ox:0,oy:0,fy:0,pulse:0}}
+squads.forEach(s=>{for(let k=0;k<s.base;k++)s.members.push(mkMember(s,rnd(3600e3*1.2,3600e3*72)));for(let k=0;k<Math.floor(s.base*.06);k++)s.members.push(mkMember(s,rnd(0,3600e3)))});
+if(you){const s=squads[you.sq]||squads[0];const m={name:you.name,sq:s,fall:you.fellDay||99,joined:you.joined,me:true,pulse:0,fy:0};s.members.push(m);you.m=m}
+const fallen=m=>m.fall<=curDay()+(viewDay?0:dayFrac());
+function dayFrac(){const d=realDay();if(d<1||d>30)return 0;return ((Date.now()-START)%86400000)/86400000}
+const isNew=m=>!viewDay&&Date.now()-m.joined<3600e3;
+
+/* ---------- layout ---------- */
+function layoutSquad(s){const n=s.members.length;s.R=Math.sqrt(n)*7.2+16;const golden=Math.PI*(3-Math.sqrt(5));s.members.forEach((m,k)=>{const rr=Math.sqrt(k+.5)/Math.sqrt(n)*(s.R-9);m.a=k*golden;m.r=rr;m.ox=Math.cos(m.a)*rr;m.oy=Math.sin(m.a)*rr})}
+squads.forEach(layoutSquad);
+const order=squads.slice().sort((a,b)=>b.members.length-a.members.length);
+order.forEach((s,k)=>{const a=k*2.399+.6,rr=60+Math.sqrt(k)*170;s.x=Math.cos(a)*rr;s.y=Math.sin(a)*rr*.82});
+
+/* ---------- canvas ---------- */
+const cv=$('#map'),cx=cv.getContext('2d');let W,H,dpr;
+const cam={x:0,y:0,z:.8,tx:0,ty:0,tz:.8};
+function fitView(instant){let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;squads.forEach(s=>{x0=Math.min(x0,s.x-s.R-30);x1=Math.max(x1,s.x+s.R+30);y0=Math.min(y0,s.y-s.R-60);y1=Math.max(y1,s.y+s.R+50)});const left=W>900?340:0,bottom=W>900?0:H*.44,aw=W-left-30,ah=H-80-bottom;const z=clamp(Math.min(aw/(x1-x0),ah/(y1-y0)),.15,1.2);cam.tz=z;cam.tx=(x0+x1)/2-(left/2-0)/z+(W>900?0:0);cam.ty=(y0+y1)/2-((80-bottom)/2)/z;if(W>900)cam.tx=(x0+x1)/2-(left-15)/2/z;if(instant){cam.z=cam.tz;cam.x=cam.tx;cam.y=cam.ty}}
+function size(){dpr=Math.min(2,devicePixelRatio||1);W=innerWidth;H=innerHeight;cv.width=W*dpr;cv.height=H*dpr;cx.setTransform(dpr,0,0,dpr,0,0);if(!size.done){for(let i=0;i<400;i++)physics();fitView(true);size.done=1}}
+addEventListener('resize',size);
+const toS=(x,y)=>({x:(x-cam.x)*cam.z+W/2,y:(y-cam.y)*cam.z+H/2}),toW=(x,y)=>({x:(x-W/2)/cam.z+cam.x,y:(y-H/2)/cam.z+cam.y});
+let dust=Array.from({length:180},()=>({x:rnd(-2000,2000),y:rnd(-1600,1600),r:rnd(.4,1.6),p:rnd(0,6)}));
+let hl='all',query='',hover=null,hoverM=null,openSq=null,dragS=null,panning=null,moved=false;
+size();
+function memberColor(m){if(m.me)return fallen(m)?'#8a4a35':'#e4572e';if(fallen(m))return'#4a443b';if(isNew(m))return'#9ccc5a';return'#f2a93b'}
+function dim(m){if(hl==='all'&&!query)return 1;let on=true;if(hl==='hold')on=!fallen(m);else if(hl==='fell')on=fallen(m);else if(hl==='new')on=isNew(m);else if(hl==='you')on=!!m.me;if(query)on=on&&(m.name.toLowerCase().includes(query)||m.sq.name.toLowerCase().includes(query)||m.sq.tk.toLowerCase().includes(query));return on?1:.12}
+function physics(){for(let i=0;i<squads.length;i++){const a=squads[i];for(let j=i+1;j<squads.length;j++){const b=squads[j];const dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1,min=a.R+b.R+90;if(d<min){const p=(min-d)/2,ux=dx/d,uy=dy/d;if(a!==dragS){a.x-=ux*p*.5;a.y-=uy*p*.5}if(b!==dragS){b.x+=ux*p*.5;b.y+=uy*p*.5}}}
+  if(a!==dragS){a.vx+=(-a.x)*.00002;a.vy+=(-a.y)*.00002;a.x+=a.vx;a.y+=a.vy;a.vx*=.9;a.vy*=.9}}}
+function frame(now){requestAnimationFrame(frame);const t=now/1000;
+  cam.x+=(cam.tx-cam.x)*.12;cam.y+=(cam.ty-cam.y)*.12;cam.z+=(cam.tz-cam.z)*.12;physics();
+  let g=cx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*.8);g.addColorStop(0,'#1a160f');g.addColorStop(1,'#0b0907');cx.fillStyle=g;cx.fillRect(0,0,W,H);
+  for(const d of dust){const p=toS(d.x,d.y);if(p.x<-5||p.y<-5||p.x>W+5||p.y>H+5)continue;cx.globalAlpha=.25+.2*Math.sin(t+d.p);cx.fillStyle='#d8c39a';cx.fillRect(p.x,p.y,d.r,d.r)}cx.globalAlpha=1;
+  // links between neighbouring squads (mycelium)
+  cx.strokeStyle='rgba(216,195,154,.07)';cx.lineWidth=1;for(let i=0;i<order.length-1;i++){const a=toS(order[i].x,order[i].y),b=toS(order[i+1].x,order[i+1].y);cx.beginPath();cx.moveTo(a.x,a.y);cx.quadraticCurveTo((a.x+b.x)/2+30,(a.y+b.y)/2-30,b.x,b.y);cx.stroke()}
+  for(const s of squads){const c=toS(s.x,s.y),R=s.R*cam.z;if(c.x<-R-80||c.y<-R-80||c.x>W+R+80||c.y>H+R+80)continue;s.pulse*=.95;
+    const tot=s.members.length,fl=s.members.filter(fallen).length,surv=1-fl/tot;
+    g=cx.createRadialGradient(c.x,c.y,R*.2,c.x,c.y,R*1.4);g.addColorStop(0,'rgba(242,169,59,'+(.06+s.pulse*.1)+')');g.addColorStop(1,'rgba(242,169,59,0)');cx.fillStyle=g;cx.beginPath();cx.arc(c.x,c.y,R*1.4,0,6.283);cx.fill();
+    cx.strokeStyle=(hover===s||openSq===s)?'rgba(243,234,216,.7)':'rgba(216,195,154,.18)';cx.lineWidth=1;cx.beginPath();cx.arc(c.x,c.y,R+4*cam.z,0,6.283);cx.stroke();
+    cx.strokeStyle='#9ccc5a';cx.lineWidth=Math.max(1.5,2.5*cam.z);cx.beginPath();cx.arc(c.x,c.y,R+4*cam.z,-Math.PI/2,-Math.PI/2+surv*6.283);cx.stroke();
+    const dotR=Math.max(.9,2.6*cam.z);
+    for(const m of s.members){let mx=c.x+m.ox*cam.z,my=c.y+m.oy*cam.z;const f=fallen(m);if(f){m.fy=Math.min(m.fy+.4,6)}else m.fy=Math.max(0,m.fy-.6);my+=m.fy*cam.z;mx+=Math.sin(t*1.3+m.a)*.6*cam.z;
+      cx.globalAlpha=dim(m);cx.fillStyle=memberColor(m);cx.beginPath();cx.arc(mx,my,m.me?dotR*1.9:dotR,0,6.283);cx.fill();
+      if(m.pulse>0){m.pulse-=.012;cx.strokeStyle='rgba(156,204,90,'+m.pulse+')';cx.lineWidth=1.2;cx.beginPath();cx.arc(mx,my,dotR+(1-m.pulse)*22*cam.z,0,6.283);cx.stroke()}
+      if(m.me&&!f){cx.strokeStyle='rgba(228,87,46,.8)';cx.lineWidth=1.2;cx.beginPath();cx.arc(mx,my,dotR*1.9+4+Math.sin(t*4)*1.5,0,6.283);cx.stroke()}
+      if(hoverM===m){cx.strokeStyle='#fff';cx.lineWidth=1.5;cx.beginPath();cx.arc(mx,my,dotR+3,0,6.283);cx.stroke()}}
+    cx.globalAlpha=1;
+    // emblem + label
+    const er=Math.max(10,15*cam.z);cx.fillStyle='rgba(15,13,10,.85)';cx.strokeStyle='#f2a93b';cx.lineWidth=1.5;cx.beginPath();cx.arc(c.x,c.y-R-er-6*cam.z,er,0,6.283);cx.fill();cx.stroke();
+    cx.font=`${Math.round(er*1.1)}px system-ui,"Apple Color Emoji","Segoe UI Emoji"`;cx.textAlign='center';cx.textBaseline='middle';cx.fillText(s.em,c.x,c.y-R-er-6*cam.z+1);
+    cx.font=`700 ${Math.max(11,13*Math.min(1.3,cam.z+.3))}px "Bricolage Grotesque",system-ui`;cx.fillStyle='#f3ead8';cx.fillText('$'+s.tk,c.x,c.y+R+16);
+    cx.font=`400 ${Math.max(9,10*Math.min(1.2,cam.z+.3))}px "Martian Mono",monospace`;cx.fillStyle='#b5a88e';cx.fillText(`${Math.round(surv*100)}% holding · ${fmt(tot)}`,c.x,c.y+R+31)}
+}
+requestAnimationFrame(frame);
+
+/* ---------- interaction ---------- */
+function squadAt(x,y){const w=toW(x,y);let best=null;for(const s of squads){const d=Math.hypot(w.x-s.x,w.y-s.y);if(d<s.R+18)best=s}return best}
+function memberAt(x,y,s){if(!s||cam.z<.9)return null;const w=toW(x,y);let b=null,bd=8/cam.z;for(const m of s.members){const d=Math.hypot(w.x-(s.x+m.ox),w.y-(s.y+m.oy+m.fy));if(d<bd){bd=d;b=m}}return b}
+cv.addEventListener('pointerdown',e=>{moved=false;const s=squadAt(e.clientX,e.clientY);const w=toW(e.clientX,e.clientY);if(s){dragS=s;s.dragOff={x:w.x-s.x,y:w.y-s.y}}else panning={x:e.clientX,y:e.clientY,cx:cam.tx,cy:cam.ty};cv.classList.add('drag');cv.setPointerCapture(e.pointerId)});
+cv.addEventListener('pointermove',e=>{if(dragS){const w=toW(e.clientX,e.clientY);const nx=w.x-dragS.dragOff.x,ny=w.y-dragS.dragOff.y;if(Math.hypot(nx-dragS.x,ny-dragS.y)>.5)moved=true;dragS.x=nx;dragS.y=ny;return}
+  if(panning){const dx=e.clientX-panning.x,dy=e.clientY-panning.y;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;cam.tx=panning.cx-dx/cam.z;cam.ty=panning.cy-dy/cam.z;cam.x=cam.tx;cam.y=cam.ty;return}
+  hover=squadAt(e.clientX,e.clientY);hoverM=memberAt(e.clientX,e.clientY,hover);cv.style.cursor=hover?'pointer':'grab';const tip=$('#tip');
+  if(hoverM){const m=hoverM,f=fallen(m);tip.innerHTML=`<b>${esc(m.name)}</b>${m.me?' (you)':''}<div class="r"><span>${esc(m.sq.name)}</span><span>${f?'fell on day '+Math.floor(m.fall):'holding'}</span></div>`;tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';tip.classList.add('on')}
+  else if(hover){const s=hover,fl=s.members.filter(fallen).length;tip.innerHTML=`<b>${s.em} ${esc(s.name)}</b><div class="r"><span>holding</span><span>${fmt(s.members.length-fl)}</span></div><div class="r"><span>fell</span><span>${fmt(fl)}</span></div><div class="r"><span>survival</span><span>${Math.round((1-fl/s.members.length)*100)}%</span></div>`;tip.style.left=(e.clientX+14)+'px';tip.style.top=(e.clientY+14)+'px';tip.classList.add('on')}else tip.classList.remove('on')});
+cv.addEventListener('pointerup',e=>{cv.classList.remove('drag');const s=dragS;if(!moved){if(s)openSquad(s);else closeDrawer()}dragS=null;panning=null});
+cv.addEventListener('pointerleave',()=>{hover=null;hoverM=null;$('#tip').classList.remove('on')});
+cv.addEventListener('wheel',e=>{e.preventDefault();const before=toW(e.clientX,e.clientY);const nz=clamp(cam.tz*(e.deltaY>0?.88:1.14),.25,4);cam.tz=nz;cam.z=nz;const after=toW(e.clientX,e.clientY);cam.tx+=before.x-after.x;cam.ty+=before.y-after.y;cam.x=cam.tx;cam.y=cam.ty},{passive:false});
+$('#zi').onclick=()=>cam.tz=clamp(cam.tz*1.3,.25,4);$('#zo').onclick=()=>cam.tz=clamp(cam.tz/1.3,.25,4);$('#zr').onclick=()=>{fitView();closeDrawer()};
+function focusSquad(s,z){cam.tx=s.x+(W>900?110/(z||1.6):0);cam.ty=s.y+(W<=900?H*.18/(z||1.6):0);cam.tz=z||clamp(Math.min(W,H)/(s.R*3.4),.6,2.6)}
+function openSquad(s){openSq=s;focusSquad(s);renderDrawer();$('#drawer').classList.add('on')}
+function closeDrawer(){openSq=null;$('#drawer').classList.remove('on')}
+function renderDrawer(){const s=openSq;if(!s)return;const tot=s.members.length,fl=s.members.filter(fallen).length,surv=1-fl/tot,nw=s.members.filter(isNew).length;const rank=squads.slice().sort((a,b)=>sv(b)-sv(a)).indexOf(s)+1;
+  const recent=s.members.slice().sort((a,b)=>b.joined-a.joined).slice(0,14);
+  $('#drawer').innerHTML=`<button class="close" aria-label="Close">✕</button><div class="dh"><div class="em">${s.em}</div><div><h3>${esc(s.name)}</h3><small>$${s.tk} · #${rank} by survival</small></div></div>
+  <div class="surv"><i style="width:${(surv*100).toFixed(1)}%"></i></div><div style="display:flex;justify-content:space-between;font-family:var(--mono);font-size:10.5px;color:var(--mut)"><span>${Math.round(surv*100)}% holding</span><span>${Math.round((1-surv)*100)}% fell</span></div>
+  <div class="kv"><div>PLEDGED<b>${fmt(tot)}</b></div><div>HOLDING<b style="color:var(--moss)">${fmt(tot-fl)}</b></div><div>FELL<b style="color:var(--leaf)">${fmt(fl)}</b></div><div>NEW 1H<b>${fmt(nw)}</b></div></div>
+  <button class="btn pri" style="width:100%" id="joinSq">${you?'You\'re in '+esc(squads[you.sq].name):'Pledge with '+esc(s.name)}</button>
+  <div class="eyebrow" style="margin-top:14px">Latest pledgers</div><ul class="mem">${recent.map(m=>`<li class="${fallen(m)?'fell':''}"><span>${esc(m.name)}${m.me?' (you)':''}</span><span>${fallen(m)?'F · day '+Math.floor(m.fall):ago(m.joined)}</span></li>`).join('')}</ul>`;
+  $('#drawer .close').onclick=closeDrawer;$('#joinSq').onclick=()=>{if(!you)openPledge(s.i);else openSheet('pledge')}}
+const sv=s=>1-s.members.filter(fallen).length/s.members.length;
+const ago=t=>{const s=Math.floor((Date.now()-t)/1000);return s<60?s+'s':s<3600?Math.floor(s/60)+'m':Math.floor(s/3600)+'h'};
+$$('#hl .chip').forEach(c=>c.onclick=()=>{$$('#hl .chip').forEach(x=>x.classList.remove('on'));c.classList.add('on');hl=c.dataset.h;if(hl==='you'){if(!you){toast('Take the pledge to get your own dot');}else focusSquad(you.m.sq,2.4)}});
+$('#q').oninput=e=>{query=e.target.value.trim().toLowerCase();const s=squads.find(s=>query&&(s.name.toLowerCase().includes(query)||s.tk.toLowerCase().includes(query)));if(s)focusSquad(s)};
+addEventListener('keydown',e=>{if(e.key==='/'&&document.activeElement.tagName!=='INPUT'){e.preventDefault();$('#q').focus()}if(e.key==='Escape'){closeSheet();closeDrawer()}});
+$('#tm').oninput=e=>{viewDay=+e.target.value;$('#tmV').textContent=viewDay?'Nov '+viewDay:'today';squads.forEach(s=>s.members.forEach(m=>m.fy=fallen(m)?m.fy:0));renderStats();if(openSq)renderDrawer()};
+
+/* ---------- live sim ---------- */
+let feed=[],fRate=[],ff='all';
+function addFeed(o){o.at=Date.now();o.id=Math.random();feed.unshift(o);feed=feed.slice(0,60);renderFeed(o.id)}
+function simTick(){const s=pick(squads);if(Math.random()<.7||realDay()===0){const m=mkMember(s,0);m.pulse=1;s.members.push(m);s.pulse=1;addFeed({k:'pledge',e:s.em,who:m.name,sq:s.name});relayout(s)}
+  else{const live=s.members.filter(m=>!fallen(m)&&!m.me);if(live.length){const m=pick(live);m.fall=curDay()+dayFrac()-.0001;fRate.push(Date.now());addFeed({k:'fell',e:'🥀',who:m.name,sq:s.name,day:Math.max(1,realDay())});if(Math.random()<.3)nutty(pick(['F.','Another one gone.','Stay strong, team.','Not me. Never me.']))}}
+  setTimeout(simTick,rnd(1200,3200)*(document.hidden?5:1))}
+let relayT=new Set();function relayout(s){relayT.add(s);clearTimeout(relayout.t);relayout.t=setTimeout(()=>{relayT.forEach(layoutSquad);relayT.clear()},800)}
+function renderFeed(newId){let L=feed;if(ff==='pledge')L=feed.filter(f=>f.k==='pledge');if(ff==='fell')L=feed.filter(f=>f.k==='fell');
+  if(ff==='squads'){$('#feed').innerHTML=squads.slice().sort((a,b)=>sv(b)-sv(a)).map((s,i)=>`<li data-s="${s.i}"><span class="e">${s.em}</span><span><b>${i+1}. ${esc(s.name)}</b><small>${fmt(s.members.length)} pledged</small></span><span class="t">${Math.round(sv(s)*100)}%</span></li>`).join('');$$('#feed li').forEach(li=>li.onclick=()=>openSquad(squads[+li.dataset.s]));return}
+  $('#feed').innerHTML=L.slice(0,30).map(f=>`<li class="${f.k==='fell'?'fell':''} ${f.id===newId?'new':''}" data-sq="${esc(f.sq)}"><span class="e">${f.e}</span><span><b>${esc(f.who)}</b><small>${f.k==='fell'?'fell on day '+f.day+' · '+esc(f.sq):'pledged · '+esc(f.sq)}</small></span><span class="t">${ago(f.at)}</span></li>`).join('')||'<li><span></span><span style="color:var(--dim)">Quiet in the woods…</span><span></span></li>';
+  $$('#feed li[data-sq]').forEach(li=>li.onclick=()=>{const s=squads.find(x=>x.name===li.dataset.sq);if(s)openSquad(s)})}
+$$('.feedtabs button').forEach(b=>b.onclick=()=>{$$('.feedtabs button').forEach(x=>x.classList.remove('on'));b.classList.add('on');ff=b.dataset.f;renderFeed()});
+function renderStats(){let P=0,F=0,N=0;squads.forEach(s=>s.members.forEach(m=>{P++;if(fallen(m))F++;if(isNew(m))N++}));$('#sP').textContent=fmt(P);$('#sH').textContent=fmt(P-F);$('#sF').textContent=fmt(F);$('#cH').textContent=fmt(P-F);$('#cF').textContent=fmt(F);$('#cN').textContent=fmt(N);$('#sNew').textContent=fmt(N)+' new in the last hour';fRate=fRate.filter(t=>Date.now()-t<60000);$('#sRate').textContent=fRate.length+' F/min'}
+function renderDay(){const n=Date.now(),d=realDay();let txt;if(d===0){const ms=START-n,h=Math.floor(ms/3600e3),m=Math.floor(ms%3600e3/60e3),s=Math.floor(ms%60e3/1e3);txt=`<span class="lb">Starts in </span><b>${h>48?Math.ceil(h/24)+' days':String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0')}</b>`}else if(d>30)txt='<b>Survivors</b><span class="lb"> · see you next year</span>';else txt=`<span class="lb">Day </span><b>${d}/30</b><span class="lb"> · stay locked</span>`;$('#dayTxt').innerHTML=txt}
+
+/* ---------- mascot ---------- */
+const LINES=['I\'m not touching it.','Locked till December.','Nope. Not today.','Mind over acorn.','Day by day, bro.','Cold shower time.','This acorn stays shut.'];
+let bubT;function nutty(m){const b=$('#bub');b.textContent=m;b.classList.add('on');clearTimeout(bubT);bubT=setTimeout(()=>b.classList.remove('on'),2600)}
+$('#mascot').onclick=()=>{const el=$('#mascot');el.classList.remove('shake');void el.offsetWidth;el.classList.add('shake');nutty(pick(LINES));leaves(6)};
+setInterval(()=>{if(Math.random()<.35)nutty(pick(LINES))},16000);
+function leaves(n){for(let i=0;i<n;i++){const l=document.createElement('div');l.className='leaf';l.textContent=pick(['🍂','🍁','🌰']);l.style.left=rnd(0,100)+'vw';l.style.setProperty('--dx',rnd(-120,120)+'px');l.style.setProperty('--r',rnd(-360,360)+'deg');l.style.animationDuration=rnd(5,9)+'s';l.style.animationDelay=rnd(0,1.5)+'s';document.body.appendChild(l);setTimeout(()=>l.remove(),11000)}}
+setInterval(()=>leaves(1),3500);leaves(5);
+
+/* ---------- sheets ---------- */
+function openSheetHTML(h,wide){const sh=$('#sheet');sh.className='sheet on'+(wide?' wide':'');sh.innerHTML='<button class="close" aria-label="Close">✕</button>'+h;$('#scrim').classList.add('on');sh.querySelector('.close').onclick=closeSheet}
+function closeSheet(){$('#sheet').classList.remove('on');$('#scrim').classList.remove('on');stopGame();$$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.go==='map'))}
+$('#scrim').onclick=closeSheet;
+function openSheet(k){$$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.go===k));if(k==='map')return closeSheet();if(k==='pledge')return you?pledgeStatus():openPledge();if(k==='game')return openGame();if(k==='wall')return openWall()}
+$$('.tabs button').forEach(b=>b.onclick=()=>openSheet(b.dataset.go));
+$('#pledgeBtn').onclick=()=>openSheet('pledge');
+function openPledge(pre){let sel=pre??0;openSheetHTML(`<h2>Take the pledge</h2><p class="lead">Pick a squad and lock in. You'll get your own dot on the map, and it stays gold for as long as you hold.</p>
+  <label class="l">Your name</label><input class="inp" id="pN" maxlength="18" placeholder="e.g. jake_holds">
+  <label class="l">Your squad</label><div class="squads" id="pS">${squads.map(s=>`<button data-i="${s.i}" class="${s.i===sel?'on':''}"><span>${s.em}</span>${esc(s.name)}</button>`).join('')}</div>
+  <div class="oath">"I solemnly swear to keep the acorn locked from November 1 to November 30. No excuses, no loopholes, no 'it doesn't count'."</div>
+  <button class="btn pri" style="width:100%;padding:13px" id="pGo">Lock it in</button><p style="font-size:11.5px;color:var(--dim);margin-top:10px;text-align:center">A meme site. Your pledge is saved in this browser only.</p>`);
+  $$('#pS button').forEach(b=>b.onclick=()=>{$$('#pS button').forEach(x=>x.classList.remove('on'));b.classList.add('on');sel=+b.dataset.i});
+  $('#pGo').onclick=()=>{const nm=$('#pN').value.trim().replace(/[<>]/g,'')||'anon';const s=squads[sel];you={name:nm,sq:sel,joined:Date.now(),checks:[],fellDay:null};const m={name:nm,sq:s,fall:99,joined:you.joined,me:true,pulse:1,fy:0};s.members.push(m);layoutSquad(s);you.m=m;saveYou();s.pulse=1;addFeed({k:'pledge',e:s.em,who:nm+' (you)',sq:s.name});closeSheet();setTimeout(()=>{focusSquad(s,2.4);$$('#hl .chip').forEach(x=>x.classList.toggle('on',x.dataset.h==='you'));hl='you';setTimeout(()=>{hl='all';$$('#hl .chip').forEach(x=>x.classList.toggle('on',x.dataset.h==='all'))},3500)},150);leaves(14);nutty('Welcome to the holdout, '+nm+'.');toast('Locked in. Your dot is on the map.');renderPledgeBtn()}}
+function saveYou(){const c=Object.assign({},you);delete c.m;store.set('you',c)}
+function streak(){if(!you)return 0;if(you.fellDay)return 0;const d=realDay();return d===0?0:Math.min(d,30)}
+function pledgeStatus(){const d=realDay(),fell=!!you.fellDay,st=fell?you.fellDay-1:streak();const s=squads[you.sq];
+  openSheetHTML(`<h2>${esc(you.name)}'s pledge</h2><p class="lead">${s.em} ${esc(s.name)} · locked in ${new Date(you.joined).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</p>
+  <div class="me"><div class="big">${fell?'F':st}<small>${fell?' · fell on day '+you.fellDay:d===0?' days · starts tomorrow':' / 30 days held'}</small></div></div>
+  <div class="cal">${Array.from({length:30},(_,i)=>{const n=i+1;const cls=fell&&n>=you.fellDay?(n===you.fellDay?'dead':''):n<d?'ok':n===d?'today':'';return`<i class="${cls}">${n}</i>`}).join('')}</div>
+  ${fell?`<button class="btn pri" style="width:100%" id="again">Start over (it happens)</button>`:`<div class="row2"><button class="btn pri" id="held">${d===0?'Ready for Nov 1':'I held today'}</button><button class="btn gh" id="fell">I fell</button></div>`}
+  <div class="row2"><button class="btn gh" id="share">Copy brag</button><button class="btn gh" id="leave" style="flex:.5">Leave</button></div>`);
+  const h=$('#held');if(h)h.onclick=()=>{if(d===0){toast('Starts November 1. Rest up.');nutty('Tomorrow we lock in.')}else{toast(`Day ${d} held. Respect.`);leaves(10);nutty('Another day locked.')}};
+  const f=$('#fell');if(f)f.onclick=()=>{const day=Math.max(1,d);you.fellDay=day;you.m.fall=Math.min(curDay()+dayFrac()-.0001,day);saveYou();addFeed({k:'fell',e:'🥀',who:you.name+' (you)',sq:s.name,day});document.body.animate([{filter:'grayscale(0)'},{filter:'grayscale(1)'},{filter:'grayscale(0)'}],{duration:1600});toast('F. Your dot just went grey.');nutty('We lost one…');pledgeStatus()};
+  const a=$('#again');if(a)a.onclick=()=>{you.fellDay=null;you.joined=Date.now();you.m.fall=99;you.m.pulse=1;saveYou();toast('Fresh start. Locked back in.');pledgeStatus()};
+  $('#share').onclick=()=>{const txt=fell?`I fell on day ${you.fellDay} of No Nut November. Pay respects. $NUTLOCK`:`Day ${d||0} of No Nut November and still locked. ${s.em} ${s.name} squad. $NUTLOCK`;navigator.clipboard&&navigator.clipboard.writeText(txt).then(()=>toast('Copied. Go post it.'),()=>toast(txt))};
+  $('#leave').onclick=()=>{s.members=s.members.filter(m=>!m.me);layoutSquad(s);you=null;store.set('you',null);closeSheet();renderPledgeBtn();toast('You left the holdout.')}}
+function renderPledgeBtn(){$('#pledgeBtn').textContent=you?(you.fellDay?'F':'Day '+streak()+' · locked'):'Take the pledge'}
+
+/* ---------- game: resist ---------- */
+let G=null;const TEMPT=[['📱','one more scroll'],['😏','"you up?"'],['🍩','2am snacks'],['🛌','lazy Sunday'],['📺','just one episode'],['🎰','one last bet'],['💌','a DM'],['🍑','suspicious peach']];
+function openGame(){openSheetHTML(`<h2>Resist</h2><p class="lead">Temptations are coming for Nutty's acorn. Click or tap them before they reach him. Grab a 🧊 cold shower to slow everything down. Three hits and he cracks.</p><canvas id="game" width="1600" height="1000"></canvas><div class="ghud"><span>Time held <b id="gT">0.0s</b></span><span>Popped <b id="gP">0</b></span><span>Lives <b id="gL">🌰🌰🌰</b></span><span>Best <b id="gB">${(store.get('best',0)).toFixed(1)}s</b></span><button class="btn pri" id="gGo">Start</button></div>`,true);
+  const c=$('#game');c.onpointerdown=e=>{if(!G||!G.on)return;const r=c.getBoundingClientRect(),x=(e.clientX-r.left)*c.width/r.width,y=(e.clientY-r.top)*c.height/r.height;for(let i=G.items.length-1;i>=0;i--){const it=G.items[i];if(Math.hypot(x-it.x,y-it.y)<it.r+18){G.items.splice(i,1);if(it.ice){G.slow=4}else G.popped++;for(let k=0;k<12;k++)G.parts.push({x:it.x,y:it.y,vx:rnd(-6,6),vy:rnd(-6,6),l:1,c:it.ice?'#9fe3ff':'#f2a93b'});break}}};
+  $('#gGo').onclick=startGame;drawGame(0)}
+function startGame(){G={on:true,t0:performance.now(),t:0,items:[],parts:[],lives:3,popped:0,next:0,slow:0,shake:0};$('#gGo').textContent='Restart';requestAnimationFrame(gLoop)}
+function stopGame(){if(G)G.on=false}
+function gLoop(now){if(!G||!G.on)return;const c=$('#game');if(!c){G.on=false;return}const dt=1/60;G.t=(now-G.t0)/1000;G.slow=Math.max(0,G.slow-dt);const sp=(G.slow>0?.4:1)*(1+G.t/25);
+  if(G.t>G.next){G.next=G.t+Math.max(.32,1.1-G.t/40);const ice=Math.random()<.07;const tp=pick(TEMPT);const ang=rnd(Math.PI*1.1,Math.PI*1.9);G.items.push({x:800+Math.cos(ang)*900,y:820+Math.sin(ang)*900,em:ice?'🧊':tp[0],lb:ice?'cold shower':tp[1],ice,r:44,v:rnd(2.2,3.4)})}
+  for(let i=G.items.length-1;i>=0;i--){const it=G.items[i];const dx=800-it.x,dy=800-it.y,d=Math.hypot(dx,dy);it.x+=dx/d*it.v*sp;it.y+=dy/d*it.v*sp;if(d<90){G.items.splice(i,1);if(!it.ice){G.lives--;G.shake=12;if(G.lives<=0)return endGame()}}}
+  G.parts=G.parts.filter(p=>{p.x+=p.vx;p.y+=p.vy;p.l-=.03;return p.l>0});$('#gT').textContent=G.t.toFixed(1)+'s';$('#gP').textContent=G.popped;$('#gL').textContent='🌰'.repeat(G.lives)+'·'.repeat(3-G.lives);drawGame(now/1000);requestAnimationFrame(gLoop)}
+function drawGame(t){const c=$('#game');if(!c)return;const x=c.getContext('2d');x.save();x.clearRect(0,0,1600,1000);if(G&&G.shake>0){x.translate(rnd(-G.shake,G.shake),rnd(-G.shake,G.shake));G.shake*=.85}
+  if(G&&G.slow>0){x.fillStyle='rgba(120,200,255,.08)';x.fillRect(0,0,1600,1000)}
+  x.strokeStyle='rgba(242,169,59,.12)';x.lineWidth=2;[150,300,450].forEach(r=>{x.beginPath();x.arc(800,800,r,Math.PI,0);x.stroke()});
+  // nutty
+  x.save();x.translate(800,800);const bob=Math.sin(t*3)*4;x.fillStyle='#a8693a';x.beginPath();x.ellipse(70,-40+bob,40,70,.4,0,6.283);x.fill();x.fillStyle='#b5733f';x.beginPath();x.ellipse(0,0+bob,62,70,0,0,6.283);x.fill();x.beginPath();x.arc(0,-90+bob,50,0,6.283);x.fill();x.fillStyle='#e8c9a0';x.beginPath();x.ellipse(0,15+bob,36,44,0,0,6.283);x.fill();
+  x.fillStyle='#1a140c';x.beginPath();x.arc(-17,-95+bob,8,0,6.283);x.arc(17,-95+bob,8,0,6.283);x.fill();x.fillStyle='#f2a93b';x.beginPath();x.ellipse(0,0+bob,24,30,0,0,6.283);x.fill();x.fillStyle='#7a4e24';x.beginPath();x.ellipse(0,-22+bob,27,13,0,0,6.283);x.fill();x.fillStyle='#1a140c';x.fillRect(-11,-4+bob,22,17);x.strokeStyle='#1a140c';x.lineWidth=4;x.beginPath();x.arc(0,-6+bob,7,Math.PI,0);x.stroke();x.restore();
+  if(G)for(const it of G.items){x.font='64px system-ui,"Apple Color Emoji","Segoe UI Emoji"';x.textAlign='center';x.textBaseline='middle';x.fillText(it.em,it.x,it.y);x.font='600 20px "Bricolage Grotesque",system-ui';x.fillStyle=it.ice?'#9fe3ff':'#f3ead8';x.fillText(it.lb,it.x,it.y+50)}
+  if(G)for(const p of G.parts){x.globalAlpha=p.l;x.fillStyle=p.c;x.fillRect(p.x,p.y,6,6)}x.globalAlpha=1;
+  if(!G||!G.on){x.fillStyle='rgba(15,13,10,.55)';x.fillRect(0,0,1600,1000);x.fillStyle='#f3ead8';x.textAlign='center';x.font='800 64px "Bricolage Grotesque",system-ui';x.fillText(G?'Nutty cracked.':'Protect the acorn',800,420);x.font='500 28px "Bricolage Grotesque",system-ui';x.fillStyle='#b5a88e';x.fillText(G?`Held for ${G.t.toFixed(1)}s and popped ${G.popped} temptations`:'Press Start',800,480)}
+  x.restore()}
+function endGame(){G.on=false;const best=store.get('best',0);if(G.t>best){store.set('best',G.t);$('#gB').textContent=G.t.toFixed(1)+'s';toast('New best: '+G.t.toFixed(1)+'s');leaves(12)}drawGame(0)}
+
+/* ---------- wall of F ---------- */
+let fCount=store.get('f',0)+Math.floor(rnd(12000,18000));
+function openWall(){const fl=[];squads.forEach(s=>s.members.forEach(m=>{if(fallen(m))fl.push(m)}));fl.sort((a,b)=>b.fall-a.fall);
+  openSheetHTML(`<h2>Wall of F</h2><p class="lead">Here lie the fallen. They tried. Press F to pay respects.</p>
+  <div class="fbtn"><button class="fkey" id="fk">F</button><div class="fcount"><b id="fc">${fmt(fCount)}</b>respects paid</div></div>
+  <div class="wall">${fl.length?fl.slice(0,60).map(m=>`<div class="grave"><b>${esc(m.name)}</b><small>${esc(m.sq.name)}<br>fell on day ${Math.floor(m.fall)}</small></div>`).join(''):`<div class="grave" style="grid-column:1/-1"><b>Nobody yet</b><small>${realDay()===0?'November hasn\'t started. Drag the time machine to see the future.':'Everyone is still holding. For now.'}</small></div>`}</div>`,true);
+  $('#fk').onclick=e=>payF(e.clientX,e.clientY)}
+function payF(x,y){fCount++;store.set('f',(store.get('f',0))+1);const c=$('#fc');if(c)c.textContent=fmt(fCount);const p=document.createElement('div');p.className='fpop';p.textContent='F';p.style.left=(x||innerWidth/2)+'px';p.style.top=(y||innerHeight/2)+'px';document.body.appendChild(p);setTimeout(()=>p.remove(),1000)}
+addEventListener('keydown',e=>{if((e.key==='f'||e.key==='F')&&$('#fk')&&$('#sheet').classList.contains('on')){const k=$('#fk');k.classList.add('hit');setTimeout(()=>k.classList.remove('hit'),90);const r=k.getBoundingClientRect();payF(r.left+r.width/2,r.top)}});
+$('#xLink').onclick=e=>{if($('#xLink').getAttribute('href')==='#'){e.preventDefault();toast('X link coming soon')}};
+
+/* ---------- boot ---------- */
+for(let i=0;i<10;i++){const s=pick(squads);const m=pick(s.members);feed.push({k:'pledge',e:s.em,who:m.name,sq:s.name,at:Date.now()-i*rnd(5000,20000),id:Math.random()})}
+renderFeed();renderStats();renderDay();renderPledgeBtn();setTimeout(simTick,1200);
+setInterval(()=>{renderStats();renderDay();if(openSq)renderDrawer();if(ff!=='squads')renderFeed()},1000);
+setTimeout(()=>nutty(realDay()===0?'November starts soon. Lock in.':'Day '+realDay()+'. Still locked.'),1500);
+</script>
+
+</body>
+</html>
